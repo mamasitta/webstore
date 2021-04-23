@@ -10,8 +10,8 @@ from rest_framework import permissions, exceptions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from store_api.models import User
-from store_api.serializers import UserSerializer
+from store_api.models import User, Product
+from store_api.serializers import UserSerializer, ProductSerializer
 from store_api.utilits import generate_access_token, generate_refresh_token
 from webstore import settings
 
@@ -98,3 +98,12 @@ def refresh_token(request):
         raise exceptions.AuthenticationFailed('user is inactive')
     access_token = generate_access_token(user)
     return Response({'access_token': access_token})
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny,])
+def get_all_products(request):
+    products = Product.objects.all()
+    serializer = ProductSerializer(products, many=True)
+    return Response(serializer.data)
+
