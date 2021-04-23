@@ -1,10 +1,11 @@
+import jwt
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.http import HttpResponse
 from django.shortcuts import render
 
 # Create your views here.
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 from rest_framework import permissions, exceptions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -12,6 +13,7 @@ from rest_framework.response import Response
 from store_api.models import User
 from store_api.serializers import UserSerializer
 from store_api.utilits import generate_access_token, generate_refresh_token
+from webstore import settings
 
 
 def test(request):
@@ -71,3 +73,28 @@ def login_view(request):
         'user': serialized_user,
     }
     return response
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny,])
+@csrf_protect
+def refresh_token(request):
+    """Function to refresh users token need 'X-CSRFTOKEN' param in header (take from cookies in login_view)"""
+    User = get_user_model()
+    refresh_token = request.COOKIES.get('refreshtoken')
+    if refresh_token is None:
+        raise exceptions.AuthenticationFailed(
+            'Authentication credentials were not provided.')
+    try:
+        payload = jwt.decode(
+            refresh_token, settings.SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        raise exceptions.AuthenticationFailed(
+            'expired refresh token, please login again.')
+    user = User.objects.filter(id=payload.get('user_id')).first()
+    if user is None:
+        raise exceptions.AuthenticationFailed('User not found')
+    if not user.is_active:
+        raise exceptions.AuthenticationFailed('user is inactive')
+    access_token = generate_access_token(user)
+    return Response({'access_token': access_token})

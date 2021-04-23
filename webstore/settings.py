@@ -55,6 +55,9 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'webstore.urls'
 
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'store_api.authentication.SafeJWTAuthentication',
+    ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     )

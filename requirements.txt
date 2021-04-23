@@ -3,6 +3,7 @@ djangorestframework
 django-cors-headers
 requests
 PyJWT
+Pillow
 
 
 
