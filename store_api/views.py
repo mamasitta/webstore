@@ -8,16 +8,14 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 from rest_framework import permissions, exceptions, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from store_api.models import User, Product
-from store_api.serializers import UserSerializer, ProductSerializer
+from store_api.models import User, Product, Order, OrderItem
+from store_api.serializers import UserSerializer, ProductSerializer, OrderItemSerializer, OrderSerializer
 from store_api.utilits import generate_access_token, generate_refresh_token
 from webstore import settings
 
-
-def test(request):
-    return HttpResponse('Hello Julia')
 
 
 @api_view(['POST'])
@@ -101,9 +99,81 @@ def refresh_token(request):
 
 
 @api_view(['GET'])
-@permission_classes([permissions.AllowAny,])
+@permission_classes([IsAuthenticated])
+@csrf_protect
 def get_all_products(request):
+    """Function return all products"""
     products = Product.objects.all()
     serializer = ProductSerializer(products, many=True)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def get_order(request):
+    """Function return or users order or if user admin return requested orders from param"""
+    username = request.user
+    user = User.objects.filter(username=username).first()
+    # if user admin, return orders according params
+    if user.is_superuser:
+        if 'category' in request.GET:
+            category = request.GET['category']
+            if category == 'completed':
+                order = Order.objects.filter(complete=True)
+            elif category == 'uncompleted':
+                order = Order.objects.filter(complete=False)
+            elif category == 'user':
+                if 'user_id' in request.GET:
+                    user_id = request.GET['user_id']
+                    order = Order.objects.filter(user_id=user_id)
+                else:
+                    content = {'error': "user id is required"}
+                    return Response(content, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            order = Order.objects.all()
+    # if user is not admin, return users orders
+    else:
+        order = Order.objects.filter(user_id=user.id)
+    serializer = OrderSerializer(order, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@csrf_protect
+def post_order(request):
+    """Function save order from user, return order data"""
+    username = request.user
+    user = User.objects.filter(username=username).first()
+    address = request.data.get('address')
+    phone = request.data.get('phone')
+    items = request.data.get('items')
+    if address is None or phone is None or items is None or len(items) == 0:
+        content = {"error": "address, phone, and ordered items are required"}
+        return Response(content, status=status.HTTP_400_BAD_REQUEST)
+    # register new order
+    new_order = Order(user_id=user.id, address=address, phone=phone)
+    new_order.save()
+    order = Order.objects.filter(user_id=user.id).order_by('-id')[0]
+    # should be added more checks for data
+    for item in items:
+        # change amount of product in db and register new items for order
+        product = Product.objects.filter(id=item['product_id']).first()
+        product_amount = product.amount
+        if product.amount - int(item['amount']) < 0:
+            order_amount = product_amount
+            Product.objects.filter(id=item['product_id']).update(amount=0)
+        else:
+            order_amount = item['product_id']
+            Product.objects.filter(id=item['product_id']).update(amount=product_amount - order_amount)
+        new_order_item = OrderItem(order_id=order.id, product_id=item['product_id'], amount=order_amount)
+        new_order_item.save()
+    serializer = OrderSerializer(order)
+    return Response(serializer.data)
+
+
+
+
+
 
