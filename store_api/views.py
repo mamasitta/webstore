@@ -11,6 +11,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from store_api.managers.order_manager import check_order_items, save_order_items
 from store_api.models import User, Product, Order, OrderItem
 from store_api.serializers import UserSerializer, ProductSerializer, OrderItemSerializer, OrderSerializer
 from store_api.utilits import generate_access_token, generate_refresh_token
@@ -152,6 +153,11 @@ def post_order(request):
     if address is None or phone is None or items is None or len(items) == 0:
         content = {"error": "address, phone, and ordered items are required"}
         return Response(content, status=status.HTTP_400_BAD_REQUEST)
+    for item in items:
+        check_product = check_order_items(item)
+        if not check_product:
+            content = {"error": "product is not valid or do not have enough amount of items"}
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
     # register new order
     new_order = Order(user_id=user.id, address=address, phone=phone)
     new_order.save()
@@ -159,16 +165,10 @@ def post_order(request):
     # should be added more checks for data
     for item in items:
         # change amount of product in db and register new items for order
-        product = Product.objects.filter(id=item['product_id']).first()
-        product_amount = product.amount
-        if product.amount - int(item['amount']) < 0:
-            order_amount = product_amount
-            Product.objects.filter(id=item['product_id']).update(amount=0)
-        else:
-            order_amount = item['product_id']
-            Product.objects.filter(id=item['product_id']).update(amount=product_amount - order_amount)
-        new_order_item = OrderItem(order_id=order.id, product_id=item['product_id'], amount=order_amount)
-        new_order_item.save()
+        save_item = save_order_items(item=item, order_id=order.id)
+        if not save_item:
+            content = {"error": "order was not complete"}
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
     serializer = OrderSerializer(order)
     return Response(serializer.data)
 
