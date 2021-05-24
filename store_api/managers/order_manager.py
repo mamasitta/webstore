@@ -13,6 +13,7 @@ def check_order_items(item):
     else:
         return False
 
+
 def save_order_items(item, order_id):
     product = Product.objects.filter(id=item['product_id']).first()
     try:

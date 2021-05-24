@@ -5,6 +5,7 @@ requests
 PyJWT
 Pillow
 rest_framework_swagger
+pyyaml
 
 
 

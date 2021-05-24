@@ -18,11 +18,12 @@ from django.urls import path, include
 
 from rest_framework_swagger.views import get_swagger_view
 
+
 schema_view = get_swagger_view(title='Webstore API')
 
 
 urlpatterns = [
     path('', include("store_api.urls")),
     path('admin/', admin.site.urls),
-    path('openapi', schema_view, name='open_api')
+    path('openapi', schema_view, name='open_api'),
 ]
