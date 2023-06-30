@@ -44,7 +44,7 @@ class SafeJWTAuthentication(BaseAuthentication):
 
     def enforce_csrf(self, request):
         """Enforce CSRF validation"""
-        check = CSRFCheck()
+        check = CSRFCheck(request)
         check.process_request(request)
         reason = check.process_view(request, None, (), {})
         if reason:
